@@ -3,60 +3,86 @@
 #include <Tiny4kOLED.h>
 #include <TinyWireM.h>
 
+#define NOP __asm__ __volatile__ ("nop\n\t")
+
+
 //=======================[VARIABLES]==========================
 
-int val = 0; //analog value from pin
-int i = 0;
+unsigned val = 0; //analog value from pin
+unsigned i = 0;
 volatile int count = 0;
-int t = 0;
-int sens = 0;
+unsigned t = 0;
+unsigned sens = 0;
 unsigned long currentMillis = 0;
 unsigned long previousMillis = 0;
-const long interval = 1000;
+static int interrupted;
 
 
 //=======================[SETUP]==========================
 void setup() {
+
+  pinMode(0, OUTPUT);         // MOTOR  PA0
+  pinMode(1, INPUT_PULLUP);   // START  PA1
+  pinMode(2, INPUT_PULLUP);   // STOP   PA2
+  pinMode(3, OUTPUT);         // BUZZER PA3
+  pinMode(7, INPUT);          // POT    PA7
+  pinMode(8, INPUT);          // SENSOR PB2
+
+  interrupted = false;
   oled.begin();
   oled.on();
   oled.clear();
-
-  pinMode(0, OUTPUT);         // MOTOR
-  pinMode(3, OUTPUT);         // BUZZER
-  pinMode(1, INPUT_PULLUP);   // START
-  pinMode(2, INPUT_PULLUP);   // STOP
-  pinMode(7, INPUT);          // POT
-  pinMode(8, INPUT);          // SENSOR
-  attachInterrupt(8, ISR_thing(), FALLING); //GIMSK |= 0b000000001  <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-
+  //sei();
+  splashMusic();
   loop();
+}
+
+void NOPdelay(unsigned int duration) {
+  for (unsigned int q = 0; q <= duration; q++) {
+    NOP;
+  }
 }
 
 //===========================[INTERRUPT]============================
 
-void ISR_thing() {
-  count--;
+void handleInterrupt() {
+  count = count - 1;
+  interrupted = false;
 }
 
-//===========================[START_MUSIC]============================
+//===========================[BEEP]============================
 
+void beep(unsigned int onTime, unsigned int offTime, unsigned int noteCount) {
+  for (unsigned int i = 0; i <= noteCount; i++) {
+    PORTA |= (1 << PA3);
+    NOPdelay(onTime * 160000);
+    PORTA &= !(1 << PA3);
+    NOPdelay(offTime * 160000);
+  }
+}
+
+//===========================[DONE_MUSIC]============================
+void doneMusic() {
+  beep(2, 1, 8);
+}
+//===========================[START_MUSIC]===========================
 void startMusic() {
-  tone(0, HIGH);
-  delay(100);
-  tone(0, LOW);
+  beep(3, 2, 3);
 }
-
 //===========================[STOP_MUSIC]============================
 void stopMusic() {
-  tone(0, HIGH);
-  delay(300);
-  tone(0, LOW);
+  beep(2, 2, 3);
+}
+//===========================[SPLASH_MUSIC]==========================
+void splashMusic() {
+  beep(2, 1, 5);
 }
 
 //===============================[DONE]===============================
 void done() {
+  doneMusic();
   oled.setFont(FONT6X8);
-  digitalWrite(3, LOW);
+  digitalWrite(0, LOW);
   oled.setCursor(0, 0);
   oled.print(F("COUNTING DONE!    "));
   oled.setCursor(0, 1);
@@ -65,8 +91,8 @@ void done() {
   oled.setCursor(40, 2);
   oled.print(val);
   oled.print(F("                   "));
-  if (digitalRead(1) == HIGH) {
-    setVal;
+  if (digitalRead(1) == LOW) {
+    setVal();
   }
 }
 
@@ -75,45 +101,51 @@ void counting() {
 
   oled.setFont(FONT6X8);
 
-  digitalWrite(3, HIGH);
+  //TURN ON THE MOTOR
+  digitalWrite(0, HIGH);
 
   while (count > 0) {
 
-    unsigned long currentMillis = millis();
-    if (currentMillis - previousMillis >= 5) {
-      previousMillis = currentMillis;
+    if (digitalRead(8) == 0) {
+      interrupted = true;
+    }
 
-      oled.setFont(FONT6X8);
-      oled.setCursor(0, 0);
-      oled.print(F("S E T :    "));
-      oled.print(val);
-      oled.print(F("                             "));
-      oled.setCursor(0, 1);
-      oled.print(F("C U R R E N T:                          "));
+    if (interrupted) {
+      handleInterrupt();
+      interrupted = false;
+    }
+    
+    oled.setFont(FONT6X8);
+    oled.setCursor(0, 0);
+    oled.print(F("S E T :    "));
+    oled.print(val);
+    oled.print(F("                             "));
+    oled.setCursor(0, 1);
+    oled.print(F("C U R R E N T:                          "));
+    oled.setFont(FONT8X16);
+    oled.setCursor(0, 2);
+    oled.print(F("                "));
+    oled.setCursor(40, 2);
+    oled.print(count);
+
+    //IF STOP BUTTON PRESSED, TURN OFF THE MOTOR, DISPLAY STOP
+    if (digitalRead(2) == LOW) {
+      digitalWrite(0, LOW);
       oled.setFont(FONT8X16);
-      oled.setCursor(0, 2);
-      oled.print(F("                "));
-      oled.setCursor(40, 2);
-      oled.print(count);
-
-      if (digitalRead(2) == HIGH) {
-        oled.setFont(FONT8X16);
-        stopMusic();
-        oled.clear();
-        digitalWrite(3, LOW);
-        oled.setCursor(40, 0);
-        oled.print(F("S T O P!"));
-        oled.setCursor(25, 2);
-        oled.print(F("R E S E T!"));
-        delay(1000);
-        setVal();
-      }
+      stopMusic();
+      oled.clear();
+      oled.setCursor(38, 0);
+      oled.print(F("S T O P!"));
+      oled.setCursor(25, 2);
+      oled.print(F("R E S E T!"));
+      delay(1000);
+      setVal();
     }
   }
   oled.clear();
-  stopMusic();
   done();
 }
+
 //=======================[DISPLAY_SET_VALUE]==========================
 void dispSetValue() {
   oled.setFont(FONT8X16);
@@ -130,7 +162,7 @@ void dispSetValue() {
       oled.print(F("                   "));
       oled.setCursor(40, 2);
       oled.print(val);
-      if (digitalRead(1) == 1) {
+      if (digitalRead(1) == LOW) {
         oled.clear();
         count = val;
         startMusic();
@@ -156,8 +188,9 @@ void setVal() {
   oled.clear();
   dispSetValue();
 }
-//=======================[LOOP]==========================
-void loop() {
+
+//=======================[SPLASH_SCREEN]==========================
+void splashScreen() {
   oled.clear();
   oled.setFont(FONT8X16);
   oled.setCursor(3, 0);
@@ -170,4 +203,8 @@ void loop() {
   delay(2000);
   oled.setFont(FONT6X8);
   setVal();
+}
+//=======================[LOOP]==========================
+void loop() {
+  splashScreen();
 }
