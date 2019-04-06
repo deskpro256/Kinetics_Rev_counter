@@ -28,6 +28,11 @@ void setup() {
   pinMode(7, INPUT);          // POT    PA7
   pinMode(8, INPUT);          // SENSOR PB2
 
+  GIMSK |= (1 << INT0);
+  sei();
+  MCUCR &= ~(1 << ISC00);
+  MCUCR |= (1 << ISC01);
+
   interrupted = false;
   splashMusic();
   displaySetup();
@@ -50,6 +55,11 @@ void displaySetup() {
 }
 
 //===========================[INTERRUPT]============================
+
+ISR(INT0_vect) {
+  interrupted = true;
+}
+
 
 void handleInterrupt() {
   count = count - 1;
@@ -86,8 +96,8 @@ void splashMusic() {
 //===========================[SOFT_START]==========================
 void softStart() {
   unsigned int on = 0;
-  unsigned int off = 1000;
-  while (on < 1000) {
+  unsigned int off = 100;
+  while (on < 100) {
     PORTA |= (1 << PA0);
     delay(on);
     PORTA &= !(1 << PA0);
@@ -117,15 +127,16 @@ void done() {
 //===========================[COUNTING]============================
 void counting() {
 
+  ssd1306_fillScreen(0x00);
   //TURN ON THE MOTOR "softly"
   softStart();
   PORTA |= (1 << PA0);
 
   while (count > 0) {
 
-    if (digitalRead(8) == 0) {
-      interrupted = true;
-    }
+    //    if (digitalRead(8) == 0) {
+    //      interrupted = true;
+    //    }
 
     if (interrupted) {
       handleInterrupt();
@@ -164,7 +175,6 @@ void counting() {
     //IF STOP BUTTON PRESSED, TURN OFF THE MOTOR, DISPLAY STOP
     if (digitalRead(2) == LOW) {
       PORTA &= !(1 << PA0);
-      //digitalWrite(0, LOW);
       stopMusic();
 
       ssd1306_fillScreen(0x00);
@@ -177,7 +187,6 @@ void counting() {
     }
   }
 
-  ssd1306_fillScreen(0x00);
   done();
 }
 
@@ -213,7 +222,7 @@ void dispSetValue() {
       }
     }
   }
-  ssd1306_fillScreen(0x00);
+
 }
 
 //=======================[SET_DISPLAY]==========================
