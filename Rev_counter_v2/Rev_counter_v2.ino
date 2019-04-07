@@ -95,6 +95,8 @@ void splashMusic() {
 }
 //===========================[SOFT_START]==========================
 void softStart() {
+  ssd1306_fillScreen(0x00);
+  ssd1306_printFixed (40, 24, "STARTING!", STYLE_BOLD);
   unsigned int on = 0;
   unsigned int off = 100;
   while (on < 100) {
@@ -114,9 +116,11 @@ void done() {
   digitalWrite(0, LOW);
 
   while (digitalRead(1) != LOW) {
-    ssd1306_printFixed (0, 0, "COUNTING DONE!", STYLE_BOLD);
-    ssd1306_printFixed (0, 16, "REVOLUTIONS:", STYLE_BOLD);
-    ssd1306_printFixedN (30, 32, valChar, STYLE_NORMAL, FONT_SIZE_2X);
+    ssd1306_printFixed (20, 0, "COUNTING DONE!", STYLE_BOLD);
+    ssd1306_printFixed (26, 14, "REVOLUTIONS:", STYLE_BOLD);
+    ssd1306_printFixedN (30, 30, valChar, STYLE_NORMAL, FONT_SIZE_2X);
+    ssd1306_printFixed (30, 48, "PRESS START", STYLE_NORMAL);
+    ssd1306_printFixed (28, 56, "TO CONTINUE!", STYLE_NORMAL);
   }
   if (digitalRead(1) == LOW) {
     ssd1306_fillScreen(0x00);
@@ -133,10 +137,6 @@ void counting() {
   PORTA |= (1 << PA0);
 
   while (count > 0) {
-
-    //    if (digitalRead(8) == 0) {
-    //      interrupted = true;
-    //    }
 
     if (interrupted) {
       handleInterrupt();
@@ -229,9 +229,9 @@ void dispSetValue() {
 void setVal() {
 
   ssd1306_fillScreen(0x00);
-  ssd1306_printFixedN (10, 0, "SET YOUR", STYLE_NORMAL, FONT_SIZE_2X);
-  ssd1306_printFixedN (0, 16, "REVOLUTION", STYLE_NORMAL, FONT_SIZE_2X);
-  ssd1306_printFixedN (30, 32, "COUNT", STYLE_NORMAL, FONT_SIZE_2X);
+  ssd1306_printFixedN (12, 0, "SET YOUR", STYLE_NORMAL, FONT_SIZE_2X);
+  ssd1306_printFixedN (2, 16, "REVOLUTION", STYLE_NORMAL, FONT_SIZE_2X);
+  ssd1306_printFixedN (32, 32, "COUNT", STYLE_NORMAL, FONT_SIZE_2X);
   delay(2000);
   ssd1306_fillScreen(0x00);
   dispSetValue();
