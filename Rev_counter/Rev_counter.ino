@@ -1,10 +1,8 @@
 //=======================[INCLUDES]==========================
 #include <avr/io.h>
-#include <Tiny4kOLED.h>
-#include <TinyWireM.h>
+#include "ssd1306.h"
 
 #define NOP __asm__ __volatile__ ("nop\n\t")
-
 
 //=======================[VARIABLES]==========================
 
@@ -16,6 +14,8 @@ unsigned int sens = 0;
 unsigned long currentMillis = 0;
 unsigned long previousMillis = 0;
 static int interrupted;
+char valChar[5] = {'0', '0', '0', '0'};
+char countChar[5] = {'0', '0', '0', '0'};
 
 
 //=======================[SETUP]==========================
@@ -28,12 +28,14 @@ void setup() {
   pinMode(7, INPUT);          // POT    PA7
   pinMode(8, INPUT);          // SENSOR PB2
 
+  GIMSK |= (1 << INT0);
+  sei();
+  MCUCR &= ~(1 << ISC00);
+  MCUCR |= (1 << ISC01);
+
   interrupted = false;
-  oled.begin();
-  oled.on();
-  oled.switchRenderFrame();
-  oled.clear();
   splashMusic();
+  displaySetup();
   loop();
 }
 
@@ -43,7 +45,21 @@ void NOPdelay(unsigned int duration) {
   }
 }
 
+//===========================[DISPLAY_SETUP]============================
+
+void displaySetup() {
+  ssd1306_128x64_i2c_init();
+  ssd1306_fillScreen(0x00);
+  ssd1306_setFixedFont(ssd1306xled_font6x8);
+
+}
+
 //===========================[INTERRUPT]============================
+
+ISR(INT0_vect) {
+  interrupted = true;
+}
+
 
 void handleInterrupt() {
   count = count - 1;
@@ -79,6 +95,8 @@ void splashMusic() {
 }
 //===========================[SOFT_START]==========================
 void softStart() {
+  ssd1306_fillScreen(0x00);
+  ssd1306_printFixed (40, 24, "STARTING!", STYLE_BOLD);
   unsigned int on = 0;
   unsigned int off = 100;
   while (on < 100) {
@@ -94,17 +112,18 @@ void softStart() {
 //===============================[DONE]===============================
 void done() {
   doneMusic();
-  oled.setFont(FONT6X8);
+  ssd1306_fillScreen(0x00);
   digitalWrite(0, LOW);
-  oled.setCursor(0, 0);
-  oled.print(F("COUNTING DONE!    "));
-  oled.setCursor(0, 1);
-  oled.print(F(" REVS:           "));
-  oled.setFont(FONT8X16);
-  oled.setCursor(40, 2);
-  oled.print(val);
-  oled.print(F("                   "));
+
+  while (digitalRead(1) != LOW) {
+    ssd1306_printFixed (20, 0, "COUNTING DONE!", STYLE_BOLD);
+    ssd1306_printFixed (26, 14, "REVOLUTIONS:", STYLE_BOLD);
+    ssd1306_printFixedN (30, 30, valChar, STYLE_NORMAL, FONT_SIZE_2X);
+    ssd1306_printFixed (30, 48, "PRESS START", STYLE_NORMAL);
+    ssd1306_printFixed (28, 56, "TO CONTINUE!", STYLE_NORMAL);
+  }
   if (digitalRead(1) == LOW) {
+    ssd1306_fillScreen(0x00);
     setVal();
   }
 }
@@ -112,58 +131,68 @@ void done() {
 //===========================[COUNTING]============================
 void counting() {
 
-  oled.setFont(FONT6X8);
-
+  ssd1306_fillScreen(0x00);
   //TURN ON THE MOTOR "softly"
   softStart();
   PORTA |= (1 << PA0);
 
   while (count > 0) {
 
-    if (digitalRead(8) == 0) {
-      interrupted = true;
-    }
-
     if (interrupted) {
       handleInterrupt();
       interrupted = false;
     }
+    if (count >= 1000) {
+      countChar[0] = ((count / 1000) + '0');                       //  tūkstoši  1
+      countChar[1] = (((count % 1000) / 100) + '0');               //  simti     2
+      countChar[2] = ((((count % 1000) % 100) / 10) + '0');        //  desmiti   3
+      countChar[3] = (((((count % 1000) % 100) % 10) / 1) + '0');  //  vieni     4
+    }
+    else if (count < 1000) {
+      countChar[0] = 0x20;      //show nothing
+      countChar[1] = (((count % 1000) / 100) + '0');               //  simti     2
+      countChar[2] = ((((count % 1000) % 100) / 10) + '0');        //  desmiti   3
+      countChar[3] = (((((count % 1000) % 100) % 10) / 1) + '0');  //  vieni     4
+    }
+    else if (count < 100) {
+      countChar[0] = 0x20;      //show nothing
+      countChar[0] = 0x20;      //show nothing
+      countChar[2] = ((((count % 1000) % 100) / 10) + '0');        //  desmiti   3
+      countChar[3] = (((((count % 1000) % 100) % 10) / 1) + '0');  //  vieni     4
+    }
+    else if (count < 10) {
+      countChar[0] = 0x20;      //show nothing
+      countChar[0] = 0x20;      //show nothing
+      countChar[0] = 0x20;      //show nothing
+      countChar[3] = (((((count % 1000) % 100) % 10) / 1) + '0');  //  vieni     4
+    }
 
-    oled.setFont(FONT6X8);
-    oled.setCursor(0, 0);
-    oled.print(F("S E T :    "));
-    oled.print(val);
-    oled.print(F("                             "));
-    oled.setCursor(0, 1);
-    oled.print(F("C U R R E N T:                          "));
-    oled.setFont(FONT8X16);
-    oled.setCursor(0, 2);
-    oled.print(F("                "));
-    oled.setCursor(40, 2);
-    oled.print(count);
+    ssd1306_printFixedN (0, 0, "SET: ", STYLE_NORMAL, FONT_SIZE_2X);
+    ssd1306_printFixedN (45, 0, valChar, STYLE_NORMAL, FONT_SIZE_2X);
+    ssd1306_printFixedN (0, 20, "CURRENT: ", STYLE_NORMAL, FONT_SIZE_2X);
+    ssd1306_printFixedN (30, 40, countChar, STYLE_NORMAL, FONT_SIZE_2X);
 
     //IF STOP BUTTON PRESSED, TURN OFF THE MOTOR, DISPLAY STOP
     if (digitalRead(2) == LOW) {
       PORTA &= !(1 << PA0);
-      //digitalWrite(0, LOW);
-      oled.setFont(FONT8X16);
       stopMusic();
-      oled.clear();
-      oled.setCursor(38, 0);
-      oled.print(F("S T O P!"));
-      oled.setCursor(25, 2);
-      oled.print(F("R E S E T!"));
+
+      ssd1306_fillScreen(0x00);
+      ssd1306_printFixedN (35, 0, "STOP!", STYLE_NORMAL, FONT_SIZE_2X);
+      ssd1306_printFixedN (30, 30, "RESET!", STYLE_NORMAL, FONT_SIZE_2X);
+
       delay(1000);
+      ssd1306_fillScreen(0x00);
       setVal();
     }
   }
-  oled.clear();
+
   done();
 }
 
 //=======================[DISPLAY_SET_VALUE]==========================
 void dispSetValue() {
-  oled.setFont(FONT8X16);
+
   while (1) {
     unsigned long currentMillis = millis();
     if (currentMillis - previousMillis >= 1) {
@@ -171,52 +200,50 @@ void dispSetValue() {
       val = analogRead(7);
       val = map(val, 0, 1021, 1, 50);
       val = val * 100;
-      oled.setCursor(0, 0);
-      oled.print(F("S E T  L I M I T"));
-      oled.setCursor(0, 2);
-      oled.print(F("                   "));
-      oled.setCursor(40, 2);
-      oled.print(val);
+
+      if (val < 999) {
+        valChar[0] = 0x20;
+        valChar[1] = ((val % 1000) / 100) + '0';
+      }
+      else {
+        valChar[0] = (val / 1000) + '0';
+        valChar[1] = ((val % 1000) / 100) + '0';
+      }
+
+      ssd1306_printFixedN (0, 0, "SET LIMIT:", STYLE_NORMAL, FONT_SIZE_2X);
+      ssd1306_printFixedN (30, 30, valChar, STYLE_NORMAL, FONT_SIZE_2X);
+
+
       if (digitalRead(1) == LOW) {
-        oled.clear();
+        ssd1306_fillScreen(0x00);
         count = val;
         startMusic();
-        oled.setFont(FONT6X8);
         counting();
       }
     }
   }
-  oled.clear();
+
 }
 
 //=======================[SET_DISPLAY]==========================
 void setVal() {
-  oled.clear();
-  oled.setFont(FONT6X8);
-  oled.setCursor(10, 1);
-  oled.print(F(" S E T  Y O U R"));
-  oled.setCursor(2, 2);
-  oled.print(F("R E V O L U T I O N"));
-  oled.setCursor(20, 3);
-  oled.print(F("  C O U N T"));
+
+  ssd1306_fillScreen(0x00);
+  ssd1306_printFixedN (12, 0, "SET YOUR", STYLE_NORMAL, FONT_SIZE_2X);
+  ssd1306_printFixedN (2, 16, "REVOLUTION", STYLE_NORMAL, FONT_SIZE_2X);
+  ssd1306_printFixedN (32, 32, "COUNT", STYLE_NORMAL, FONT_SIZE_2X);
   delay(2000);
-  oled.clear();
+  ssd1306_fillScreen(0x00);
   dispSetValue();
 }
 
 //=======================[SPLASH_SCREEN]==========================
 void splashScreen() {
-  oled.clear();
-  oled.setFont(FONT8X16);
-  oled.setCursor(3, 0);
-  oled.print(F("K I N E T I C S"));
-  oled.setFont(FONT6X8);
-  oled.setCursor(30, 2);
-  oled.print(F("REVOLUTION"));
-  oled.setCursor(35, 3);
-  oled.print(F(" COUNTER"));
+  ssd1306_fillScreen(0x00);
+  ssd1306_printFixedN (12, 8, "KINETICS", STYLE_NORMAL, FONT_SIZE_2X);
+  ssd1306_printFixed (4, 32, "R E V O L U T I O N", STYLE_NORMAL);
+  ssd1306_printFixed (20, 48, "C O U N T E R", STYLE_NORMAL);
   delay(2000);
-  oled.setFont(FONT6X8);
   setVal();
 }
 //=======================[LOOP]==========================
