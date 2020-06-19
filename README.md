@@ -1,4 +1,4 @@
-# Kinetics_Rev_counter
+# Kinetics Rev counter
 Custom designed counter for Kinetics Nail Systems
 
 The problem:
@@ -10,4 +10,12 @@ This device saves time, because now there is a way to automate it.
 
 Now the person only needs to set the wight and the amount of times to rub the material.
 
-This device is based on an ATTINY84 on a custom PCB
+This device is based on an Atmel ATTINY84 on a custom PCB with an OLED display and some buttons for input.
+The schematic and PCB were designed in EasyEDA. Project link:
+https://easyeda.com/deskpro256/Kinetics_rev_counter
+There are design files in the repository for manufacturing if needed.
+
+How the device operates:
+
+The
+
