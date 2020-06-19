@@ -10,3 +10,4 @@ This device saves time, because now there is a way to automate it.
 
 Now the person only needs to set the wight and the amount of times to rub the material.
 
+This device is based on an ATTINY84 on a custom PCB
