@@ -8,7 +8,7 @@ Kinetics needed a solution for repeatable friction setup for their nail polish d
 
 This device saves time, because now there is a way to automate it.
 
-Now the person only needs to set the wight and the amount of times to rub the material.
+Now the person only needs to set the weight and the amount of times to rub the material.
 
 This device is based on an Atmel ATTINY84 on a custom PCB with an OLED display and some buttons for input.
 The schematic and PCB were designed in EasyEDA. Project link.
